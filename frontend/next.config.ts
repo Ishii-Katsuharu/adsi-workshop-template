@@ -5,6 +5,8 @@ const basePath = isSageMaker ? "/codeeditor/default/absports/3000" : "";
 
 const nextConfig: NextConfig = {
   basePath,
+  skipTrailingSlashRedirect: isSageMaker,
+  allowedDevOrigins: ["gumcw8jrw2r5cyg.studio.ap-northeast-1.sagemaker.aws"],
   async rewrites() {
     return [
       {

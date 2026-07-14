@@ -22,6 +22,7 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const url = withBasePath(`/api${path}`);
   const response = await fetch(url, {
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       ...options?.headers,
@@ -30,11 +31,15 @@ export async function apiFetch<T>(
   });
 
   if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    throw new ApiError(
-      response.status,
-      body.message || `Request failed with status ${response.status}`
-    );
+    let message = `Request failed with status ${response.status}`;
+    const contentLength = response.headers.get("content-length");
+    if (contentLength && contentLength !== "0") {
+      const body = await response.json().catch(() => ({}));
+      if (body.message) {
+        message = body.message;
+      }
+    }
+    throw new ApiError(response.status, message);
   }
 
   if (response.status === 204) {

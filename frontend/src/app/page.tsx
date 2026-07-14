@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth";
 import { clockIn, clockOut, getToday, getMonthly } from "@/lib/attendance-api";
 import type { TodayStatusResponse, MonthlyAttendanceResponse } from "@/types/attendance";
 import { ApiError } from "@/lib/api-client";
@@ -18,12 +20,20 @@ function formatTime(time: string | null): string {
 }
 
 export default function DashboardPage() {
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [todayStatus, setTodayStatus] = useState<TodayStatusResponse | null>(null);
   const [monthly, setMonthly] = useState<MonthlyAttendanceResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const currentYearMonth = new Date().toISOString().slice(0, 7);
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push("/login");
+    }
+  }, [user, authLoading, router]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -46,8 +56,10 @@ export default function DashboardPage() {
   }, [currentYearMonth]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (user) {
+      fetchData();
+    }
+  }, [user, fetchData]);
 
   async function handleClockIn() {
     try {
@@ -73,9 +85,11 @@ export default function DashboardPage() {
     }
   }
 
-  if (loading) {
+  if (authLoading || loading) {
     return <div className="text-gray-500">読み込み中...</div>;
   }
+
+  if (!user) return null;
 
   const status = todayStatus?.status ?? "NOT_CLOCKED_IN";
   const attendance = todayStatus?.attendance;

@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "dev:sagemaker": "SAGEMAKER=1 NEXT_PUBLIC_BASE_PATH=/codeeditor/default/absports/3000 next dev -p 3000",
+    "dev:sagemaker": "SAGEMAKER=1 NEXT_PUBLIC_BASE_PATH=/codeeditor/default/absports/3000 next dev -p 3001 -H 127.0.0.1 & node scripts/sagemaker-proxy.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -12,6 +12,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "http-proxy": "^1.18.1",
     "next": "16.2.10",
     "react": "19.2.4",
     "react-dom": "19.2.4"
