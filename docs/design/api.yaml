@@ -1,0 +1,713 @@
+openapi: 3.0.3
+info:
+  title: 勤怠管理システム API
+  version: 1.0.0
+  description: 勤怠管理Webアプリケーションの REST API
+
+servers:
+  - url: http://localhost:8080/api
+    description: 開発環境
+
+tags:
+  - name: auth
+    description: 認証
+  - name: attendance
+    description: 勤怠打刻
+  - name: leave
+    description: 有給休暇
+  - name: approval
+    description: 承認
+  - name: employees
+    description: 社員管理
+  - name: reports
+    description: レポート
+
+paths:
+  # === 認証 ===
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: ログイン
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: ログイン成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: 認証失敗
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      summary: ログアウト
+      responses:
+        '204':
+          description: ログアウト成功
+
+  /auth/me:
+    get:
+      tags: [auth]
+      summary: 現在のユーザー情報取得
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeResponse'
+
+  # === 勤怠打刻 ===
+  /attendances/clock-in:
+    post:
+      tags: [attendance]
+      summary: 出勤打刻
+      responses:
+        '200':
+          description: 打刻成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttendanceResponse'
+        '409':
+          description: 既に出勤済み
+
+  /attendances/clock-out:
+    post:
+      tags: [attendance]
+      summary: 退勤打刻
+      responses:
+        '200':
+          description: 打刻成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttendanceResponse'
+        '409':
+          description: 未出勤または既に退勤済み
+
+  /attendances/today:
+    get:
+      tags: [attendance]
+      summary: 当日の勤怠状態取得
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttendanceResponse'
+
+  /attendances/monthly:
+    get:
+      tags: [attendance]
+      summary: 月次勤怠一覧取得
+      parameters:
+        - name: yearMonth
+          in: query
+          required: true
+          schema:
+            type: string
+            example: "2026-07"
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MonthlyAttendanceResponse'
+
+  /attendances/{id}:
+    put:
+      tags: [attendance]
+      summary: 勤怠手動修正
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AttendanceModifyRequest'
+      responses:
+        '200':
+          description: 修正成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttendanceResponse'
+        '400':
+          description: 当月外の修正、理由未入力等
+
+  # === 有給休暇 ===
+  /leaves:
+    post:
+      tags: [leave]
+      summary: 有給申請
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LeaveCreateRequest'
+      responses:
+        '201':
+          description: 申請成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeaveResponse'
+        '400':
+          description: 残日数不足等
+    get:
+      tags: [leave]
+      summary: 自分の有給申請一覧取得
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LeaveResponse'
+
+  /leaves/balance:
+    get:
+      tags: [leave]
+      summary: 有給残日数取得
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeaveBalanceResponse'
+
+  # === 承認 ===
+  /approvals/attendances:
+    get:
+      tags: [approval]
+      summary: 承認待ち勤怠一覧取得（上長）
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AttendanceApprovalResponse'
+
+  /approvals/attendances/{id}/approve:
+    post:
+      tags: [approval]
+      summary: 勤怠承認
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 承認成功
+
+  /approvals/attendances/{id}/reject:
+    post:
+      tags: [approval]
+      summary: 勤怠差し戻し
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 差し戻し成功
+
+  /approvals/leaves:
+    get:
+      tags: [approval]
+      summary: 承認待ち有給一覧取得（上長）
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LeaveResponse'
+
+  /approvals/leaves/{id}/approve:
+    post:
+      tags: [approval]
+      summary: 有給承認
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 承認成功
+
+  /approvals/leaves/{id}/reject:
+    post:
+      tags: [approval]
+      summary: 有給却下
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 却下成功
+
+  /approvals/pending-count:
+    get:
+      tags: [approval]
+      summary: 未承認件数取得（上長）
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PendingCountResponse'
+
+  # === 社員管理 ===
+  /employees:
+    get:
+      tags: [employees]
+      summary: 社員一覧取得（管理者）
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EmployeeResponse'
+    post:
+      tags: [employees]
+      summary: 社員登録（管理者）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmployeeCreateRequest'
+      responses:
+        '201':
+          description: 登録成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeResponse'
+
+  /employees/{id}:
+    get:
+      tags: [employees]
+      summary: 社員詳細取得
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeResponse'
+    put:
+      tags: [employees]
+      summary: 社員編集（管理者）
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmployeeUpdateRequest'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeResponse'
+
+  /employees/{id}/deactivate:
+    post:
+      tags: [employees]
+      summary: 社員無効化（管理者）
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: 無効化成功
+
+  /employees/{id}/reset-password:
+    post:
+      tags: [employees]
+      summary: パスワードリセット（管理者）
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetRequest'
+      responses:
+        '204':
+          description: リセット成功
+
+  # === レポート ===
+  /reports/monthly:
+    get:
+      tags: [reports]
+      summary: 月次勤怠レポートCSV出力（管理者）
+      parameters:
+        - name: yearMonth
+          in: query
+          required: true
+          schema:
+            type: string
+            example: "2026-07"
+        - name: departmentId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: employeeId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: CSV ファイル
+          content:
+            text/csv:
+              schema:
+                type: string
+
+components:
+  schemas:
+    # === Request ===
+    LoginRequest:
+      type: object
+      required: [employeeId, password]
+      properties:
+        employeeId:
+          type: integer
+          format: int64
+        password:
+          type: string
+
+    AttendanceModifyRequest:
+      type: object
+      required: [clockIn, clockOut, breakStart, breakEnd, reason]
+      properties:
+        clockIn:
+          type: string
+          format: time
+          example: "09:15"
+        clockOut:
+          type: string
+          format: time
+          example: "18:00"
+        breakStart:
+          type: string
+          format: time
+          example: "12:00"
+        breakEnd:
+          type: string
+          format: time
+          example: "13:00"
+        reason:
+          type: string
+          maxLength: 500
+
+    LeaveCreateRequest:
+      type: object
+      required: [date, type, reason]
+      properties:
+        date:
+          type: string
+          format: date
+        type:
+          type: string
+          enum: [FULL_DAY, AM_HALF, PM_HALF]
+        reason:
+          type: string
+          maxLength: 500
+
+    EmployeeCreateRequest:
+      type: object
+      required: [name, email, departmentId, role, password]
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        email:
+          type: string
+          format: email
+        departmentId:
+          type: integer
+          format: int64
+        role:
+          type: string
+          enum: [EMPLOYEE, MANAGER, ADMIN]
+        position:
+          type: string
+          maxLength: 100
+        password:
+          type: string
+          minLength: 8
+
+    EmployeeUpdateRequest:
+      type: object
+      required: [name, email, departmentId, role]
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        email:
+          type: string
+          format: email
+        departmentId:
+          type: integer
+          format: int64
+        role:
+          type: string
+          enum: [EMPLOYEE, MANAGER, ADMIN]
+        position:
+          type: string
+          maxLength: 100
+
+    PasswordResetRequest:
+      type: object
+      required: [newPassword]
+      properties:
+        newPassword:
+          type: string
+          minLength: 8
+
+    # === Response ===
+    LoginResponse:
+      type: object
+      properties:
+        employee:
+          $ref: '#/components/schemas/EmployeeResponse'
+
+    EmployeeResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        email:
+          type: string
+        departmentId:
+          type: integer
+          format: int64
+        departmentName:
+          type: string
+        role:
+          type: string
+        position:
+          type: string
+        active:
+          type: boolean
+        paidLeaveBalance:
+          type: integer
+
+    AttendanceResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        date:
+          type: string
+          format: date
+        clockIn:
+          type: string
+          format: time
+        clockOut:
+          type: string
+          format: time
+        breaks:
+          type: array
+          items:
+            $ref: '#/components/schemas/BreakRecordResponse'
+        workDurationMinutes:
+          type: integer
+          description: 実労働時間（分）
+        overtimeMinutes:
+          type: integer
+          description: 残業時間（分）
+        modifiedManually:
+          type: boolean
+        modificationReason:
+          type: string
+        approvalStatus:
+          type: string
+          enum: [PENDING, APPROVED, REJECTED]
+
+    MonthlyAttendanceResponse:
+      type: object
+      properties:
+        yearMonth:
+          type: string
+          example: "2026-07"
+        attendances:
+          type: array
+          items:
+            $ref: '#/components/schemas/AttendanceResponse'
+        totalWorkDurationMinutes:
+          type: integer
+        totalOvertimeMinutes:
+          type: integer
+        workDays:
+          type: integer
+
+    BreakRecordResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        startTime:
+          type: string
+          format: time
+        endTime:
+          type: string
+          format: time
+
+    LeaveResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        employeeId:
+          type: integer
+          format: int64
+        employeeName:
+          type: string
+        date:
+          type: string
+          format: date
+        type:
+          type: string
+          enum: [FULL_DAY, AM_HALF, PM_HALF]
+        reason:
+          type: string
+        status:
+          type: string
+          enum: [PENDING, APPROVED, REJECTED]
+
+    LeaveBalanceResponse:
+      type: object
+      properties:
+        totalDays:
+          type: integer
+          example: 20
+        usedDays:
+          type: number
+          format: float
+          example: 3.5
+        remainingDays:
+          type: number
+          format: float
+          example: 16.5
+
+    AttendanceApprovalResponse:
+      type: object
+      properties:
+        attendance:
+          $ref: '#/components/schemas/AttendanceResponse'
+        employeeId:
+          type: integer
+          format: int64
+        employeeName:
+          type: string
+
+    PendingCountResponse:
+      type: object
+      properties:
+        attendanceCount:
+          type: integer
+        leaveCount:
+          type: integer
+        totalCount:
+          type: integer
+
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
