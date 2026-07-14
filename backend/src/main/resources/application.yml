@@ -1,0 +1,15 @@
+spring:
+  application:
+    name: attendance
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    date-format: yyyy-MM-dd
+    time-zone: Asia/Tokyo
+
+server:
+  port: 8080

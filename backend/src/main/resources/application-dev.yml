@@ -1,0 +1,7 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/${POSTGRES_DB:attendance}
+    username: ${POSTGRES_USER:attendance}
+    password: ${POSTGRES_PASSWORD:attendance}
+  flyway:
+    enabled: true
