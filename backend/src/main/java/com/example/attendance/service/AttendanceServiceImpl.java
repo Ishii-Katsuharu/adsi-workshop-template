@@ -25,6 +25,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
@@ -35,6 +36,7 @@ public class AttendanceServiceImpl implements AttendanceService {
 
     private static final LocalTime DEFAULT_BREAK_START = LocalTime.of(12, 0);
     private static final LocalTime DEFAULT_BREAK_END = LocalTime.of(13, 0);
+    private static final ZoneId JST = ZoneId.of("Asia/Tokyo");
 
     private final AttendanceRepository attendanceRepository;
     private final BreakRecordRepository breakRecordRepository;
@@ -54,12 +56,12 @@ public class AttendanceServiceImpl implements AttendanceService {
 
     @Override
     public AttendanceResponse clockIn(Long employeeId) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(JST);
         attendanceRepository.findByEmployeeIdAndDate(employeeId, today)
             .ifPresent(a -> { throw new ConflictException("既に出勤済みです"); });
 
-        LocalTime now = LocalTime.now().truncatedTo(ChronoUnit.MINUTES);
-        LocalDateTime timestamp = LocalDateTime.now();
+        LocalTime now = LocalTime.now(JST).truncatedTo(ChronoUnit.MINUTES);
+        LocalDateTime timestamp = LocalDateTime.now(JST);
 
         Employee employeeRef = entityManager.getReference(Employee.class, employeeId);
         Attendance attendance = Attendance.builder()
@@ -87,7 +89,7 @@ public class AttendanceServiceImpl implements AttendanceService {
 
     @Override
     public AttendanceResponse clockOut(Long employeeId) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(JST);
         Attendance attendance = attendanceRepository.findByEmployeeIdAndDate(employeeId, today)
             .orElseThrow(() -> new ConflictException("出勤打刻がありません"));
 
@@ -95,9 +97,9 @@ public class AttendanceServiceImpl implements AttendanceService {
             throw new ConflictException("既に退勤済みです");
         }
 
-        LocalTime now = LocalTime.now().truncatedTo(ChronoUnit.MINUTES);
+        LocalTime now = LocalTime.now(JST).truncatedTo(ChronoUnit.MINUTES);
         attendance.setClockOut(now);
-        attendance.setUpdatedAt(LocalDateTime.now());
+        attendance.setUpdatedAt(LocalDateTime.now(JST));
         attendance = attendanceRepository.save(attendance);
 
         BreakRecord breakRecord = breakRecordRepository.findByAttendanceId(attendance.getId())
@@ -129,14 +131,14 @@ public class AttendanceServiceImpl implements AttendanceService {
         attendance.setModifiedManually(true);
         attendance.setModificationReason(request.reason());
         attendance.setApprovalStatus(ApprovalStatus.PENDING);
-        attendance.setUpdatedAt(LocalDateTime.now());
+        attendance.setUpdatedAt(LocalDateTime.now(JST));
         attendance = attendanceRepository.save(attendance);
 
         BreakRecord breakRecord = breakRecordRepository.findByAttendanceId(attendanceId)
             .orElseThrow(() -> new ResourceNotFoundException("BreakRecord", attendanceId));
         breakRecord.setStartTime(request.breakStart());
         breakRecord.setEndTime(request.breakEnd());
-        breakRecord.setUpdatedAt(LocalDateTime.now());
+        breakRecord.setUpdatedAt(LocalDateTime.now(JST));
         breakRecord = breakRecordRepository.save(breakRecord);
 
         WorkDuration workDuration = calculateWorkDuration(attendance, breakRecord);
@@ -146,7 +148,7 @@ public class AttendanceServiceImpl implements AttendanceService {
     @Override
     @Transactional(readOnly = true)
     public TodayStatusResponse getToday(Long employeeId) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(JST);
         var attendanceOpt = attendanceRepository.findByEmployeeIdAndDate(employeeId, today);
 
         if (attendanceOpt.isEmpty()) {
@@ -217,13 +219,13 @@ public class AttendanceServiceImpl implements AttendanceService {
 
     @Override
     public void autoClockOutOvernight() {
-        LocalDate yesterday = LocalDate.now().minusDays(1);
+        LocalDate yesterday = LocalDate.now(JST).minusDays(1);
         List<Attendance> unclosed = attendanceRepository.findByDateAndClockOutIsNull(yesterday);
 
         LocalTime autoClockOut = LocalTime.of(23, 59);
         for (Attendance attendance : unclosed) {
             attendance.setClockOut(autoClockOut);
-            attendance.setUpdatedAt(LocalDateTime.now());
+            attendance.setUpdatedAt(LocalDateTime.now(JST));
             attendanceRepository.save(attendance);
             log.info("Auto clock-out for employee {} on {}", attendance.getEmployee().getId(), yesterday);
         }
@@ -243,7 +245,7 @@ public class AttendanceServiceImpl implements AttendanceService {
         if (attendance.getClockIn() == null) {
             return null;
         }
-        LocalTime now = LocalTime.now().truncatedTo(ChronoUnit.MINUTES);
+        LocalTime now = LocalTime.now(JST).truncatedTo(ChronoUnit.MINUTES);
         LocalTime breakStart = breakRecord != null ? breakRecord.getStartTime() : DEFAULT_BREAK_START;
         LocalTime breakEnd = breakRecord != null ? breakRecord.getEndTime() : DEFAULT_BREAK_END;
         return workDurationCalculator.calculate(
